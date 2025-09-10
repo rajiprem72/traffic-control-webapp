@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Scheduled YouTube Video Player</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    #player {
+      display: none; /* keep player hidden (audio only) */
+    }
+    #log {
+      margin-top: 20px;
+      font-family: monospace;
+      white-space: pre;
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 200px;
+      overflow-y: auto;
+      text-align: left;
+      background: #f9f9f9;
+    }
+    #next {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: darkblue;
+    }
+  </style>
+</head>
+<body>
+  <h2>Scheduled YouTube Video Player</h2>
+
+  <div id="next"></div>
+
+  <!-- Hidden YouTube player -->
+  <div id="player"></div>
+
+  <!-- Debug log -->
+  <div id="log">Waiting for schedule…</div>
+
+  <!-- YouTube API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <!-- Main App Script -->
+  <script src="script.js"></script>
+  <!-- Service Worker Registration -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js")
+        .then(() => console.log("Service Worker registered"))
+        .catch((err) => console.error("Service Worker failed:", err));
+    }
+  </script>
+</body>
+</html>

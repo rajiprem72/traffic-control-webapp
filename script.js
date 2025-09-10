@@ -27,28 +27,58 @@ fetch("schedule.json")
   .then(schedule => {
     log("📂 Schedule loaded (" + schedule.length + " items)");
 
+    function updateNextSong() {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      // Find next scheduled item
+      let nextItem = null;
+      for (const item of schedule) {
+        const [h, m] = item.time.split(":").map(Number);
+        const itemMinutes = h * 60 + m;
+        if (itemMinutes > currentMinutes) {
+          nextItem = item;
+          break;
+        }
+      }
+
+      // If no future song today, wrap to the first item tomorrow
+      if (!nextItem && schedule.length > 0) {
+        nextItem = schedule[0];
+      }
+
+      if (nextItem) {
+        document.getElementById("next").textContent =
+          `⏭ Next: ${nextItem.name} at ${nextItem.time}`;
+      }
+    }
+
     setInterval(() => {
       const now = new Date();
       const currentTime = now.getHours().toString().padStart(2, "0") + ":" +
                           now.getMinutes().toString().padStart(2, "0");
 
+      // Play matching video
       schedule.forEach(item => {
         if (item.time === currentTime) {
-          // Send notification
           if (Notification.permission === "granted") {
             new Notification("▶ Time to play", { body: item.name });
           }
 
-          // Update screen
           document.getElementById("next").textContent =
             `▶ Playing: ${item.name} at ${item.time}`;
           log(`🎵 Playing: ${item.name} (${item.time})`);
 
-          // Play video
           player.loadVideoById(item.videoId);
           player.playVideo();
+
+          // After playing, update to next song
+          setTimeout(updateNextSong, 2000);
         }
       });
     }, 60000); // check every minute
+
+    // Show next song immediately at startup
+    updateNextSong();
   })
   .catch(err => log("❌ Failed to load JSON: " + err));

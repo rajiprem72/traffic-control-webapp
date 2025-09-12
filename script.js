@@ -1,125 +1,111 @@
 let schedule = [];
-let lastPlayed = null;
 let player;
-let replayButton;
+let unlocked = false;
+let lastPlayed = null;
+let isPlaying = false;
 
-async function loadSchedule() {
-  try {
-    const response = await fetch("schedule.json?nocache=" + Date.now()); // avoid cache
-    schedule = await response.json();
-    log("✅ Schedule loaded");
-  } catch (err) {
-    log("❌ Error loading schedule: " + err);
-  }
-}
-
-function init() {
-  loadSchedule();
-  setInterval(checkSchedule, 1000);
-  replayButton = document.getElementById("replayButton");
-}
+const logDiv = document.getElementById("log");
+const nextDiv = document.getElementById("next");
+const replayBtn = document.getElementById("replayBtn");
 
 function log(msg) {
   console.log(msg);
-  const logDiv = document.getElementById("log");
-  if (logDiv) {
-    logDiv.innerHTML = msg;
+  logDiv.textContent += msg + "\n";
+  logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+// Load schedule (no-cache)
+async function loadSchedule() {
+  try {
+    const res = await fetch("schedule.json?nocache=" + Date.now());
+    schedule = await res.json();
+    log(`📂 Schedule loaded (${schedule.length} items)`);
+    updateNext();
+  } catch (e) {
+    log("❌ Failed to load schedule: " + e);
   }
 }
 
-function notify(title, body) {
-  if (Notification.permission === "granted") {
-    new Notification(title, { body });
-  }
-}
+// Show next item
+function updateNext() {
+  const now = new Date();
+  const hhmm = now.toTimeString().slice(0, 5);
+  const nextItem = schedule.find(item => item.time >= hhmm);
 
-function createPlayer(videoId, type) {
-  if (player && player.destroy) {
-    player.destroy();
-  }
-
-  player = new YT.Player("player", {
-    height: type === "video" ? "200" : "0",
-    width: type === "video" ? "300" : "0",
-    videoId: videoId,
-    events: {
-      onReady: () => {
-        player.playVideo();
-        log("▶ Playing now...");
-      },
-      onError: (e) => log("❌ Player error: " + e.data),
-      onStateChange: (e) => {
-        if (e.data === YT.PlayerState.ENDED) {
-          log("⏹ Finished: " + lastPlayed.name);
-          document.getElementById("player").style.display = "none"; // auto-hide
-        }
-      },
-    },
-  });
-
-  const playerDiv = document.getElementById("player");
-  if (type === "video") {
-    playerDiv.style.display = "block";
+  if (nextItem) {
+    nextDiv.textContent = `⏭ Next: ${nextItem.name} (${nextItem.type}) at ${nextItem.time}`;
   } else {
-    playerDiv.style.display = "none";
+    nextDiv.textContent = "✅ All items for today are done.";
   }
 }
 
-function playItem(item) {
-  log(`▶ Playing: ${item.name} (${item.type}) at ${item.time}`);
-  notify("▶ Now Playing", `${item.name} (${item.type})`);
-
-  createPlayer(item.videoId, item.type);
-
-  lastPlayed = item;
-  showReplayButton(item);
-  updateNextItem(item);
-}
-
-function replayItem(item) {
-  log(`🔁 Replaying: ${item.name} (${item.type})`);
-  createPlayer(item.videoId, item.type);
-}
-
-function showReplayButton(item) {
-  if (replayButton) {
-    replayButton.style.display = "inline-block";
-    replayButton.innerText = `▶ Replay: ${item.name} (${item.type})`;
-    replayButton.onclick = () => replayItem(item);
-  }
-}
-
-function updateNextItem(currentItem) {
-  const index = schedule.findIndex((i) => i.time === currentItem.time);
-  const next = schedule[index + 1];
-  const nextDiv = document.getElementById("next");
-  if (nextDiv) {
-    if (next) {
-      nextDiv.innerText = `⏭ Next: ${next.name} (${next.type}) at ${next.time}`;
-    } else {
-      nextDiv.innerText = "✅ End of today's schedule";
-    }
-  }
-}
-
-function checkSchedule() {
-  if (!schedule || schedule.length === 0) return;
+// Check schedule every 5s
+setInterval(() => {
+  if (!unlocked || isPlaying) return; // don’t restart if playing
 
   const now = new Date();
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mm = String(now.getMinutes()).padStart(2, "0");
-  const currentTime = `${hh}:${mm}`;
+  const hhmm = now.toTimeString().slice(0, 5);
 
-  const item = schedule.find((i) => i.time === currentTime);
-
-  if (item && (!lastPlayed || lastPlayed.time !== item.time)) {
-    playItem(item);
+  const match = schedule.find(item => item.time === hhmm);
+  if (match) {
+    playItem(match);
+  } else {
+    updateNext();
   }
+}, 5000);
+
+// Play a scheduled item
+function playItem(item) {
+  log(`▶ Playing: ${item.name} (${item.type}) at ${item.time}`);
+  lastPlayed = item;
+  replayBtn.style.display = "inline-block";
+
+  if (item.type === "audio") {
+    document.getElementById("player").style.display = "none";
+    player.loadVideoById(item.videoId);
+  } else {
+    document.getElementById("player").style.display = "block";
+    player.loadVideoById(item.videoId);
+  }
+  isPlaying = true;
+  player.playVideo();
 }
 
-window.onload = () => {
-  if ("Notification" in window && Notification.permission !== "granted") {
-    Notification.requestPermission();
+// Replay button
+replayBtn.addEventListener("click", () => {
+  if (lastPlayed) {
+    playItem(lastPlayed);
   }
-  init();
-};
+});
+
+// Unlock audio/video button
+document.getElementById("unlockAudio").addEventListener("click", () => {
+  unlocked = true;
+  log("🔓 Audio/Video unlocked by user");
+  alert("Audio/Video enabled. The schedule will now play automatically.");
+});
+
+// YouTube Iframe API ready
+function onYouTubeIframeAPIReady() {
+  player = new YT.Player("player", {
+    height: "0",
+    width: "0",
+    videoId: "",
+    events: {
+      onReady: () => {
+        log("✅ YouTube Player Ready");
+        loadSchedule();
+      },
+      onStateChange: (event) => {
+        if (event.data === YT.PlayerState.ENDED) {
+          isPlaying = false;
+          document.getElementById("player").style.display = "none";
+          log("⏹ Playback finished");
+        }
+        if (event.data === YT.PlayerState.PLAYING) {
+          isPlaying = true;
+        }
+      }
+    }
+  });
+}

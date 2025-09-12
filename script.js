@@ -1,104 +1,141 @@
-let schedule = [];
 let player;
-let currentItem = null;
-let nextDiv = document.getElementById("next");
-let logDiv = document.getElementById("log");
+let schedule = [];
+let lastPlayed = null;
+let currentIndex = -1;
 
-// --- Utility Logger ---
-function log(msg) {
-  const time = new Date().toLocaleTimeString();
-  logDiv.textContent += `[${time}] ${msg}\n`;
-  logDiv.scrollTop = logDiv.scrollHeight;
-}
-
-// --- Load schedule.json (always fresh, bypass cache) ---
-async function loadSchedule() {
-  try {
-    const response = await fetch("schedule.json?nocache=" + Date.now());
-    schedule = await response.json();
-    log(`📂 Schedule loaded (${schedule.length} items)`);
-    updateNextItem();
-  } catch (e) {
-    log("❌ Failed to load schedule: " + e);
-  }
-}
-
-// --- YouTube API Ready ---
+// YouTube API ready
 function onYouTubeIframeAPIReady() {
   player = new YT.Player("player", {
-    height: "0",  // hidden
-    width: "0",   // hidden
+    height: "200",
+    width: "300",
     events: {
-      onReady: () => log("✅ YouTube Player Ready")
-    }
+      onReady: () => log("✅ YouTube Player Ready"),
+    },
   });
 }
 
-// --- Check schedule every 5s ---
-setInterval(checkSchedule, 5000);
+// Utility log function
+function log(msg) {
+  const logDiv = document.getElementById("log");
+  logDiv.textContent += msg + "\n";
+  logDiv.scrollTop = logDiv.scrollHeight;
+  console.log(msg);
+}
 
-function checkSchedule() {
-  if (!schedule.length) return;
+// Notification
+function notify(title, body) {
+  if (Notification.permission === "granted") {
+    new Notification(title, { body });
+  }
+}
 
+// Show replay button
+function showReplayButton(item) {
+  const nextDiv = document.getElementById("next");
+  nextDiv.innerHTML = `
+    ⏮ Missed: ${item.name} (${item.type}) 
+    <button onclick='replayItem(${JSON.stringify(item)})'>▶ Replay</button>
+  `;
+}
+
+// Replay function
+function replayItem(item) {
+  log(`🔁 Replaying: ${item.name} (${item.type})`);
+
+  if (player && player.loadVideoById) {
+    player.loadVideoById(item.videoId);
+  }
+
+  // Toggle player visibility
+  const playerDiv = document.getElementById("player");
+  if (item.type === "video") {
+    playerDiv.style.display = "block";
+  } else {
+    playerDiv.style.display = "none";
+  }
+}
+
+// Play scheduled item
+function playItem(item) {
+  log(`▶ Playing: ${item.name} (${item.type}) at ${item.time}`);
+  notify("▶ Now Playing", `${item.name} (${item.type})`);
+
+  if (player && player.loadVideoById) {
+    player.loadVideoById(item.videoId);
+  }
+
+  // Toggle player visibility
+  const playerDiv = document.getElementById("player");
+  if (item.type === "video") {
+    playerDiv.style.display = "block"; // show video
+  } else {
+    playerDiv.style.display = "none";  // hide video
+  }
+
+  // Save last played
+  lastPlayed = item;
+  showReplayButton(item);
+}
+
+// Find next item
+function updateNextItem() {
   const now = new Date();
-  const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+  const currentTime =
+    now.getHours().toString().padStart(2, "0") +
+    ":" +
+    now.getMinutes().toString().padStart(2, "0");
 
-  const item = schedule.find(s => s.time === currentTime);
-  if (item && (!currentItem || currentItem.time !== currentTime)) {
-    currentItem = item;
+  const upcoming = schedule.find((item) => item.time > currentTime);
+
+  const nextDiv = document.getElementById("next");
+  if (upcoming) {
+    nextDiv.innerHTML = `⏭ Next: ${upcoming.name} (${upcoming.type}) at ${upcoming.time}`;
+  } else {
+    nextDiv.innerHTML = "✅ All items done for today";
+  }
+}
+
+// Main scheduler loop
+function checkSchedule() {
+  const now = new Date();
+  const currentTime =
+    now.getHours().toString().padStart(2, "0") +
+    ":" +
+    now.getMinutes().toString().padStart(2, "0");
+
+  const item = schedule.find((entry) => entry.time === currentTime);
+
+  if (item && (!lastPlayed || lastPlayed.time !== item.time)) {
     playItem(item);
   }
 
   updateNextItem();
 }
 
-// --- Play item ---
-function playItem(item) {
-  log(`▶ Playing: ${item.name} (${item.type}) at ${item.time}`);
+// Fetch schedule.json
+function loadSchedule() {
+  fetch("schedule.json?cache=" + Date.now()) // cache-buster
+    .then((res) => res.json())
+    .then((data) => {
+      schedule = data;
+      log(`📂 Schedule loaded (${schedule.length} items)`);
 
-  if (player && player.loadVideoById) {
-    player.loadVideoById(item.videoId);
-  }
-
-  // Show replay button
-  showReplayButton(item);
+      updateNextItem();
+    })
+    .catch((err) => log("❌ Failed to load schedule: " + err));
 }
 
-// --- Show replay button after play ---
-function showReplayButton(item) {
-  nextDiv.innerHTML = `✅ Last Played: ${item.name} (${item.type}) at ${item.time}`;
-  const replayBtn = document.createElement("button");
-  replayBtn.textContent = `🔁 Replay ${item.type}`;
-  replayBtn.onclick = () => {
-    log(`🔁 Replaying: ${item.name}`);
-    if (player && player.loadVideoById) {
-      player.loadVideoById(item.videoId);
-    }
-  };
-  nextDiv.appendChild(document.createElement("br"));
-  nextDiv.appendChild(replayBtn);
-}
-
-// --- Show next upcoming item ---
-function updateNextItem() {
-  const now = new Date();
-  const currentTime = now.toTimeString().slice(0, 5);
-
-  // Find next item after current time
-  const upcoming = schedule.find(s => s.time > currentTime);
-  if (upcoming) {
-    nextDiv.innerHTML = `⏭ Next: ${upcoming.name} (${upcoming.type}) at ${upcoming.time}`;
-  }
-}
-
-// --- Notification Permission ---
-if (Notification && Notification.permission !== "granted") {
-  Notification.requestPermission().then(p => {
-    log(`🔔 Notification permission: ${p}`);
-  });
+// Ask permission for notifications
+if (Notification.permission !== "granted") {
+  Notification.requestPermission().then((p) =>
+    log("🔔 Notification permission: " + p)
+  );
 } else {
-  log(`🔔 Notification permission: ${Notification.permission}`);
+  log("🔔 Notification permission: granted");
 }
 
-// --- Start ---
+// Load schedule
 loadSchedule();
+
+// Check every 30s
+setInterval(checkSchedule, 30000);

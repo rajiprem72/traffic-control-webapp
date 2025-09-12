@@ -1,6 +1,8 @@
 let schedule = [];
 let player;
 let deferredPrompt = null;
+let currentPlaying = null; // track which is playing
+let lastPlayed = null; // store last item for replay
 
 // Utility log function
 function log(msg) {
@@ -48,6 +50,14 @@ document.getElementById("unlockAudio").addEventListener("click", () => {
   log("🔓 Audio/Video unlocked for autoplay on mobile");
 });
 
+// Replay last played
+document.getElementById("replayBtn").addEventListener("click", () => {
+  if (lastPlayed) {
+    log(`🔁 Replaying: ${lastPlayed.title} (${lastPlayed.type})`);
+    playItem(lastPlayed, true);
+  }
+});
+
 // Load schedule.json
 async function loadSchedule() {
   try {
@@ -75,11 +85,11 @@ function showNext() {
 
   if (future.length > 0) {
     document.getElementById("next").textContent =
-      `⏭ Next: ${future[0].title} at ${future[0].time}`;
+      `⏭ Next: ${future[0].title} (${future[0].type}) at ${future[0].time}`;
   }
 }
 
-// Check schedule every minute
+// Check schedule every 10s
 setInterval(() => {
   const now = new Date();
   const current = `${String(now.getHours()).padStart(2, "0")}:${String(
@@ -87,28 +97,34 @@ setInterval(() => {
   ).padStart(2, "0")}`;
 
   const match = schedule.find((item) => item.time === current);
-  if (match) {
+  if (match && currentPlaying !== match.time) {
+    currentPlaying = match.time;
     playItem(match);
   }
-}, 10000); // every 10s for testing
+}, 10000); // check every 10 seconds
 
 // Play audio/video
-function playItem(item) {
-  log(`▶ Playing: ${item.title} (${item.type}) at ${item.time}`);
+function playItem(item, isReplay = false) {
+  log(`${isReplay ? "🔁" : "▶"} Playing: ${item.title} (${item.type}) at ${item.time}`);
   player.loadVideoById(item.videoId);
 
   if (item.type === "audio") {
     player.setSize(0, 0); // hide
   } else {
-    player.setSize(640, 360); // show
+    player.setSize(640, 360); // show video
   }
 
+  lastPlayed = item; // store last played
+  document.getElementById("replayBtn").style.display = "inline-block";
+
   // Send notification
-  if (Notification.permission === "granted") {
+  if (!isReplay && Notification.permission === "granted") {
     new Notification("▶ Now Playing", {
-      body: `${item.title} at ${item.time}`,
+      body: `${item.title} (${item.type}) at ${item.time}`,
     });
   }
+
+  showNext();
 }
 
 // Request notification permission

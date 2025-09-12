@@ -2,14 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Scheduled YouTube Video Player</title>
+  <title>Scheduled YouTube Player</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#000000">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- mobile scaling -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
+      margin: 15px;
+      font-size: 18px; /* bigger text for mobile */
+    }
+    h2 {
+      font-size: 22px;
+      margin-bottom: 15px;
     }
     button {
       padding: 10px 15px;
@@ -18,57 +24,68 @@
       border-radius: 6px;
       background: #007BFF;
       color: white;
-      font-size: 14px;
+      font-size: 16px;
       cursor: pointer;
     }
     button:disabled {
       background: gray;
       cursor: not-allowed;
     }
+    #next {
+      font-weight: bold;
+      margin: 15px 0;
+      color: darkblue;
+    }
     #player {
-             margin-top: 20px;
-             }
-
+      margin-top: 15px;
+    }
     #log {
       margin-top: 20px;
       font-family: monospace;
-      white-space: pre;
+      white-space: pre-wrap;
       border: 1px solid #ccc;
       padding: 10px;
-      height: 200px;
+      height: 180px;
       overflow-y: auto;
+      font-size: 14px;
+    }
+    #replayButton {
+      display: none;
+      margin-top: 10px;
+      background: #28a745;
     }
   </style>
 </head>
 <body>
-  <h2>Scheduled YouTube Video Player</h2>
+  <h2>🎵 Scheduled YouTube Player</h2>
 
   <!-- Buttons -->
   <button id="installBtn" style="display:none;">📲 Install App</button>
   <button id="unlockAudio">🔓 Enable Audio/Video</button>
-  <button id="replayBtn" style="display:none;">▶ Replay Last</button>
 
-  <!-- Next video info -->
-  <div id="next" style="font-weight:bold; margin:15px 0; color:darkblue;"></div>
+  <!-- Next file info -->
+  <div id="next"></div>
 
-  <!-- YouTube Player -->
+  <!-- YouTube Player (shown only for video type) -->
   <div id="player"></div>
+
+  <!-- Replay last file -->
+  <button id="replayButton">▶ Replay Last</button>
 
   <!-- Debug Log -->
   <div id="log"></div>
 
+  <!-- Scripts -->
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="script.js"></script>
 
   <script>
-    // Register Service Worker
+    // Register Service Worker for PWA
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js")
-        .then(() => console.log("Service Worker registered"))
-        .catch(err => console.error("Service Worker failed:", err));
+        .then(() => console.log("✅ Service Worker registered"))
+        .catch(err => console.error("❌ Service Worker failed:", err));
     }
   </script>
 </body>
 </html>
-
-

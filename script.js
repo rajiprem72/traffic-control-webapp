@@ -70,13 +70,18 @@ function playItem(item) {
   lastPlayed = item;
   replayBtn.style.display = "inline-block";
 
-  if (item.type === "audio") {
-    document.getElementById("player").style.display = "none";
+  const playerDiv = document.getElementById("player");
+
+  if (item.type === "video") {
+    // Show video player
+    playerDiv.style.display = "block";
     player.loadVideoById(item.videoId);
   } else {
-    document.getElementById("player").style.display = "block";
+    // Hide iframe for audio, but still play
+    playerDiv.style.display = "none";
     player.loadVideoById(item.videoId);
   }
+
   isPlaying = true;
   player.playVideo();
 }
@@ -119,4 +124,5 @@ function onYouTubeIframeAPIReady() {
     }
   });
 }
+
 

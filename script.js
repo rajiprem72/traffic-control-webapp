@@ -13,19 +13,29 @@ function log(msg) {
   logDiv.textContent += msg + "\n";
   logDiv.scrollTop = logDiv.scrollHeight;
 }
-
 // Load schedule (no-cache)
 async function loadSchedule() {
   try {
     const res = await fetch("schedule.json?nocache=" + Date.now());
     schedule = await res.json();
     log(`📂 Schedule loaded (${schedule.length} items)`);
+    renderScheduleList();
     updateNext();
   } catch (e) {
     log("❌ Failed to load schedule: " + e);
   }
 }
 
+// Render full schedule
+function renderScheduleList() {
+  const listDiv = document.getElementById("scheduleList");
+  listDiv.innerHTML = "";
+  schedule.forEach(item => {
+    const div = document.createElement("div");
+    div.textContent = `${item.name} (${item.type}) - ${item.time}`;
+    listDiv.appendChild(div);
+  });
+}
 // Show next item
 function updateNext() {
   const now = new Date();
@@ -109,3 +119,4 @@ function onYouTubeIframeAPIReady() {
     }
   });
 }
+

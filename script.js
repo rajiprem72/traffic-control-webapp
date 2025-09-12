@@ -1,117 +1,104 @@
-let player;
 let schedule = [];
-let lastPlayed = null;
-let isPlaying = false;
-const nextDiv = document.getElementById("next");
-const logDiv = document.getElementById("log");
+let player;
+let currentItem = null;
+let nextDiv = document.getElementById("next");
+let logDiv = document.getElementById("log");
 
-// ---- Logging helper ----
+// --- Utility Logger ---
 function log(msg) {
-  const now = new Date().toLocaleTimeString();
-  logDiv.textContent += `[${now}] ${msg}\n`;
+  const time = new Date().toLocaleTimeString();
+  logDiv.textContent += `[${time}] ${msg}\n`;
   logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-// ---- Load schedule with cache-busting ----
+// --- Load schedule.json (always fresh, bypass cache) ---
 async function loadSchedule() {
   try {
-    const response = await fetch(`schedule.json?nocache=${Date.now()}`);
+    const response = await fetch("schedule.json?nocache=" + Date.now());
     schedule = await response.json();
     log(`📂 Schedule loaded (${schedule.length} items)`);
-  } catch (err) {
-    log("❌ Failed to load schedule: " + err);
+    updateNextItem();
+  } catch (e) {
+    log("❌ Failed to load schedule: " + e);
   }
 }
 
-// ---- YouTube API Ready ----
+// --- YouTube API Ready ---
 function onYouTubeIframeAPIReady() {
   player = new YT.Player("player", {
-    height: "300",
-    width: "100%",
-    videoId: "",
-    playerVars: { autoplay: 0, controls: 1 },
+    height: "0",  // hidden
+    width: "0",   // hidden
     events: {
-      onReady: () => {
-        log("✅ YouTube Player Ready");
-        startChecking();
-      },
-      onStateChange: (event) => {
-        if (event.data === YT.PlayerState.PLAYING) {
-          isPlaying = true;
-        } else if (
-          event.data === YT.PlayerState.ENDED ||
-          event.data === YT.PlayerState.PAUSED
-        ) {
-          isPlaying = false;
-        }
-      },
-    },
+      onReady: () => log("✅ YouTube Player Ready")
+    }
   });
 }
 
-// ---- Play Item ----
-function playItem(item) {
-  if (!item) return;
-  lastPlayed = item;
-  isPlaying = true;
+// --- Check schedule every 5s ---
+setInterval(checkSchedule, 5000);
 
-  log(`▶️ Playing: ${item.name} (${item.type}) at ${item.time}`);
+function checkSchedule() {
+  if (!schedule.length) return;
 
-  if (item.type === "video") {
-    player.loadVideoById(item.videoId);
-  } else {
-    // audio-only → hide video but play audio
-    player.loadVideoById(item.videoId);
-    player.mute();
-    player.unMute(); // quick unmute so audio plays without showing video controls
+  const now = new Date();
+  const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+
+  const item = schedule.find(s => s.time === currentTime);
+  if (item && (!currentItem || currentItem.time !== currentTime)) {
+    currentItem = item;
+    playItem(item);
   }
 
-  // show replay button
+  updateNextItem();
+}
+
+// --- Play item ---
+function playItem(item) {
+  log(`▶ Playing: ${item.name} (${item.type}) at ${item.time}`);
+
+  if (player && player.loadVideoById) {
+    player.loadVideoById(item.videoId);
+  }
+
+  // Show replay button
   showReplayButton(item);
 }
 
-// ---- Replay Button ----
+// --- Show replay button after play ---
 function showReplayButton(item) {
-  nextDiv.innerHTML = `⏭ Next: ${item.name} (${item.type}) at ${item.time} `;
+  nextDiv.innerHTML = `✅ Last Played: ${item.name} (${item.type}) at ${item.time}`;
   const replayBtn = document.createElement("button");
-  replayBtn.textContent = `🔁 Replay`;
-  replayBtn.onclick = () => playItem(item);
+  replayBtn.textContent = `🔁 Replay ${item.type}`;
+  replayBtn.onclick = () => {
+    log(`🔁 Replaying: ${item.name}`);
+    if (player && player.loadVideoById) {
+      player.loadVideoById(item.videoId);
+    }
+  };
+  nextDiv.appendChild(document.createElement("br"));
   nextDiv.appendChild(replayBtn);
 }
 
-// ---- Check Schedule ----
-function checkSchedule() {
-  if (isPlaying) {
-    // don’t interrupt while playing
-    return;
-  }
-
+// --- Show next upcoming item ---
+function updateNextItem() {
   const now = new Date();
-  const currentTime = now.toTimeString().slice(0, 5); // HH:MM
+  const currentTime = now.toTimeString().slice(0, 5);
 
-  // find if something matches now
-  const currentItem = schedule.find((item) => item.time === currentTime);
-
-  if (currentItem && lastPlayed !== currentItem) {
-    playItem(currentItem);
-  } else {
-    // show upcoming
-    const upcoming = schedule.find((item) => item.time > currentTime);
-    if (upcoming) {
-      const songName = upcoming.name || "(No name)";
-      const songType = upcoming.type || "unknown";
-      nextDiv.textContent = `⏭ Next: ${songName} (${songType}) at ${upcoming.time}`;
-    } else {
-      nextDiv.textContent = "✅ All scheduled items for today are done.";
-    }
+  // Find next item after current time
+  const upcoming = schedule.find(s => s.time > currentTime);
+  if (upcoming) {
+    nextDiv.innerHTML = `⏭ Next: ${upcoming.name} (${upcoming.type}) at ${upcoming.time}`;
   }
 }
 
-// ---- Start Checking ----
-function startChecking() {
-  checkSchedule();
-  setInterval(checkSchedule, 5000); // check every 5s
+// --- Notification Permission ---
+if (Notification && Notification.permission !== "granted") {
+  Notification.requestPermission().then(p => {
+    log(`🔔 Notification permission: ${p}`);
+  });
+} else {
+  log(`🔔 Notification permission: ${Notification.permission}`);
 }
 
-// ---- Init ----
+// --- Start ---
 loadSchedule();

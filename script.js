@@ -2,23 +2,46 @@ let player;
 let schedule = [];
 let lastPlayed = null;
 let isPlaying = false;
+const nextDiv = document.getElementById("next");
+const logDiv = document.getElementById("log");
 
+// ---- Logging helper ----
 function log(msg) {
-  const logDiv = document.getElementById("log");
-  logDiv.textContent += msg + "\n";
+  const now = new Date().toLocaleTimeString();
+  logDiv.textContent += `[${now}] ${msg}\n`;
   logDiv.scrollTop = logDiv.scrollHeight;
 }
 
+// ---- Load schedule with cache-busting ----
+async function loadSchedule() {
+  try {
+    const response = await fetch(`schedule.json?nocache=${Date.now()}`);
+    schedule = await response.json();
+    log(`📂 Schedule loaded (${schedule.length} items)`);
+  } catch (err) {
+    log("❌ Failed to load schedule: " + err);
+  }
+}
+
+// ---- YouTube API Ready ----
 function onYouTubeIframeAPIReady() {
   player = new YT.Player("player", {
-    height: "200",
-    width: "320",
+    height: "300",
+    width: "100%",
+    videoId: "",
+    playerVars: { autoplay: 0, controls: 1 },
     events: {
-      onReady: () => log("✅ YouTube Player Ready"),
+      onReady: () => {
+        log("✅ YouTube Player Ready");
+        startChecking();
+      },
       onStateChange: (event) => {
         if (event.data === YT.PlayerState.PLAYING) {
           isPlaying = true;
-        } else if (event.data === YT.PlayerState.ENDED || event.data === YT.PlayerState.PAUSED) {
+        } else if (
+          event.data === YT.PlayerState.ENDED ||
+          event.data === YT.PlayerState.PAUSED
+        ) {
           isPlaying = false;
         }
       },
@@ -26,97 +49,69 @@ function onYouTubeIframeAPIReady() {
   });
 }
 
-// Ask for notification permission
-Notification.requestPermission().then((result) => {
-  log("🔔 Notification permission: " + result);
-});
-
-// Load schedule.json fresh every time
-async function loadSchedule() {
-  try {
-    const res = await fetch("schedule.json?nocache=" + Date.now());
-    schedule = await res.json();
-    log(`📂 Schedule loaded (${schedule.length} items)`);
-    showNext();
-  } catch (e) {
-    log("❌ Failed to load schedule.json: " + e);
-  }
-}
-
-function showNext() {
-  const now = new Date();
-  const currentTime =
-    now.getHours().toString().padStart(2, "0") +
-    ":" +
-    now.getMinutes().toString().padStart(2, "0");
-
-  const upcoming = schedule.find((item) => item.time >= currentTime);
-  const nextDiv = document.getElementById("next");
-  if (upcoming) {
-    nextDiv.textContent = `⏭ Next: ${upcoming.name} (${upcoming.type}) at ${upcoming.time}`;
-  } else {
-    nextDiv.textContent = "✅ No more items for today";
-  }
-}
-
+// ---- Play Item ----
 function playItem(item) {
-  if (!player) return;
-  log(`▶ Playing: ${item.name} at ${item.time}`);
+  if (!item) return;
   lastPlayed = item;
+  isPlaying = true;
 
-  if (Notification.permission === "granted") {
-    new Notification("▶ Now Playing", { body: `${item.name} (${item.type})` });
-  }
-
-  // Show replay button
-  document.getElementById("replayBtn").style.display = "inline-block";
+  log(`▶️ Playing: ${item.name} (${item.type}) at ${item.time}`);
 
   if (item.type === "video") {
-    player.setSize(320, 200);
+    player.loadVideoById(item.videoId);
   } else {
-    player.setSize(0, 0); // hide video, keep audio
+    // audio-only → hide video but play audio
+    player.loadVideoById(item.videoId);
+    player.mute();
+    player.unMute(); // quick unmute so audio plays without showing video controls
   }
 
-  player.loadVideoById(item.videoId);
-  player.playVideo();
+  // show replay button
+  showReplayButton(item);
 }
 
-// Replay last item
-function replayLast() {
-  if (lastPlayed) {
-    log(`🔁 Replaying: ${lastPlayed.name} at ${lastPlayed.time}`);
-    playItem(lastPlayed);
+// ---- Replay Button ----
+function showReplayButton(item) {
+  nextDiv.innerHTML = `⏭ Next: ${item.name} (${item.type}) at ${item.time} `;
+  const replayBtn = document.createElement("button");
+  replayBtn.textContent = `🔁 Replay`;
+  replayBtn.onclick = () => playItem(item);
+  nextDiv.appendChild(replayBtn);
+}
+
+// ---- Check Schedule ----
+function checkSchedule() {
+  if (isPlaying) {
+    // don’t interrupt while playing
+    return;
   }
-}
-
-// Main scheduler loop
-setInterval(() => {
-  if (isPlaying) return; // don't interrupt while playing
 
   const now = new Date();
-  const currentTime =
-    now.getHours().toString().padStart(2, "0") +
-    ":" +
-    now.getMinutes().toString().padStart(2, "0");
+  const currentTime = now.toTimeString().slice(0, 5); // HH:MM
 
-  schedule.forEach((item) => {
-    if (item.time === currentTime) {
-      playItem(item);
+  // find if something matches now
+  const currentItem = schedule.find((item) => item.time === currentTime);
+
+  if (currentItem && lastPlayed !== currentItem) {
+    playItem(currentItem);
+  } else {
+    // show upcoming
+    const upcoming = schedule.find((item) => item.time > currentTime);
+    if (upcoming) {
+      const songName = upcoming.name || "(No name)";
+      const songType = upcoming.type || "unknown";
+      nextDiv.textContent = `⏭ Next: ${songName} (${songType}) at ${upcoming.time}`;
+    } else {
+      nextDiv.textContent = "✅ All scheduled items for today are done.";
     }
-  });
+  }
+}
 
-  showNext();
-}, 5000);
+// ---- Start Checking ----
+function startChecking() {
+  checkSchedule();
+  setInterval(checkSchedule, 5000); // check every 5s
+}
 
-// Load on start
+// ---- Init ----
 loadSchedule();
-
-// Replay button listener
-document.addEventListener("DOMContentLoaded", () => {
-  const replayBtn = document.createElement("button");
-  replayBtn.id = "replayBtn";
-  replayBtn.textContent = "🔁 Replay Last";
-  replayBtn.style.display = "none";
-  replayBtn.onclick = replayLast;
-  document.body.insertBefore(replayBtn, document.getElementById("next"));
-});

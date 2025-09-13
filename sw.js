@@ -1,15 +1,19 @@
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open("app-cache").then((cache) => {
-      return cache.addAll(["/", "/index.html", "/script.js", "/schedule.json"]);
-    })
-  );
+// service-worker.js
+
+self.addEventListener("install", (event) => {
+  console.log("Service Worker installed");
+  self.skipWaiting();
 });
 
-self.addEventListener("fetch", (e) => {
-  e.respondWith(
-    caches.match(e.request).then((resp) => {
-      return resp || fetch(e.request);
-    })
+self.addEventListener("activate", (event) => {
+  console.log("Service Worker activated");
+  return self.clients.claim();
+});
+
+// Handle notification click
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.openWindow("./") // Opens your PWA when user taps notification
   );
 });

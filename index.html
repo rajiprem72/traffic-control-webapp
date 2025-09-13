@@ -2,85 +2,28 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Scheduled YouTube Player</title>
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#000000">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 15px;
-      font-size: 16px;
-    }
-    button {
-      padding: 10px 15px;
-      margin: 5px;
-      border: none;
-      border-radius: 6px;
-      background: #007BFF;
-      color: white;
-      font-size: 14px;
-      cursor: pointer;
-    }
-    button:disabled {
-      background: gray;
-      cursor: not-allowed;
-    }
-    #player {
-      margin-top: 15px;
-      display: none; /* hidden until needed */
-    }
-    #log {
-      margin-top: 15px;
-      font-family: monospace;
-      white-space: pre;
-      border: 1px solid #ccc;
-      padding: 10px;
-      height: 180px;
-      overflow-y: auto;
-      font-size: 13px;
-    }
-    #next {
-      margin: 10px 0;
-      font-weight: bold;
-      color: darkblue;
-    }
-  </style>
+  <title>Divine Connectionz – Schedule Player</title>
+  <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <h2>Scheduled YouTube Player</h2>
+  <h2>📺 Scheduled Video Player</h2>
 
-  <!-- Buttons -->
+  <!-- Install App button -->
   <button id="installBtn" style="display:none;">📲 Install App</button>
-  <button id="unlockAudio">🔓 Enable Audio/Video</button>
-  <button id="replayBtn" style="display:none;">🔁 Replay Last</button>
+  <br><br>
 
-  <!-- Next video info -->
-  <div id="next"></div>
+  <!-- Video Player -->
+  <video id="videoPlayer" width="100%" height="240" controls></video>
 
-  <!-- YouTube Player -->
-  <div id="player"></div>
+  <!-- Schedule List -->
+  <h3>📅 Today’s Schedule</h3>
+  <ul id="scheduleList"></ul>
 
-  <!-- Debug Log -->
-  <div id="log"></div>
+  <!-- Log Console -->
+  <h3>📝 Log</h3>
+  <pre id="log"></pre>
 
-  <script src="https://www.youtube.com/iframe_api"></script>
   <script src="script.js"></script>
-
-  <script>
-    // Register Service Worker
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js")
-        .then(() => console.log("Service Worker registered"))
-        .catch(err => console.error("Service Worker failed:", err));
-    }
-  </script>
-  <!-- Full schedule display -->
-<h3>📅 Today’s Schedule</h3>
-<div id="scheduleList" style="margin-top:10px; line-height:1.6;"></div> 
-
 </body>
 </html>
-
-
-

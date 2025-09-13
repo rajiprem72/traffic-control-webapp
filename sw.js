@@ -1,23 +1,15 @@
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open("yt-scheduler-cache").then((cache) => {
-      return cache.addAll([
-        "/",
-        "/index.html",
-        "/script.js",
-        "/manifest.json",
-        "/schedule.json",
-        "/icon-192.png",
-        "/icon-512.png"
-      ]);
+self.addEventListener("install", (e) => {
+  e.waitUntil(
+    caches.open("app-cache").then((cache) => {
+      return cache.addAll(["/", "/index.html", "/script.js", "/schedule.json"]);
     })
   );
 });
 
-self.addEventListener("fetch", (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+self.addEventListener("fetch", (e) => {
+  e.respondWith(
+    caches.match(e.request).then((resp) => {
+      return resp || fetch(e.request);
     })
   );
 });

@@ -1,100 +1,120 @@
-// ========== Helper Functions ==========
+let schedule = [];
+let player;
+let unlocked = false;
+let lastPlayed = null;
+let isPlaying = false;
+
+const logDiv = document.getElementById("log");
+const nextDiv = document.getElementById("next");
+const replayBtn = document.getElementById("replayBtn");
+
 function log(msg) {
-  const logBox = document.getElementById("log");
-  logBox.textContent += msg + "\n";
-  logBox.scrollTop = logBox.scrollHeight;
+  console.log(msg);
+  logDiv.textContent += msg + "\n";
+  logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-async function fetchSchedule() {
+// Load schedule (no-cache)
+async function loadSchedule() {
   try {
-    const res = await fetch("schedule.json");
-    return await res.json();
+    const res = await fetch("schedule.json?nocache=" + Date.now());
+    schedule = await res.json();
+    log(`📂 Schedule loaded (${schedule.length} items)`);
+    renderScheduleList();
+    updateNext();
   } catch (e) {
-    log("❌ Failed to load schedule.json: " + e);
-    return [];
+    log("❌ Failed to load schedule: " + e);
   }
 }
 
-// ========== Video Playback ==========
-function playVideo(item) {
-  const player = document.getElementById("videoPlayer");
-  player.src = item.file;
-  player.play()
-    .then(() => log("▶️ Playing: " + item.name))
-    .catch(err => log("⚠️ Play failed: " + err));
-
-  // Notification
-  if ("Notification" in window && Notification.permission === "granted") {
-    const notif = new Notification("📺 Now Playing", {
-      body: item.name,
-      requireInteraction: true
-    });
-
-    notif.onclick = () => {
-      player.currentTime = 0;
-      player.play();
-      log("🔁 Replay clicked for: " + item.name);
-    };
-  }
-}
-
-// ========== Schedule Checker ==========
-async function startScheduler() {
-  const schedule = await fetchSchedule();
-
-  // Show schedule in UI
-  const list = document.getElementById("scheduleList");
-  list.innerHTML = "";
+// Render full schedule
+function renderScheduleList() {
+  const listDiv = document.getElementById("scheduleList");
+  listDiv.innerHTML = "";
   schedule.forEach(item => {
-    const li = document.createElement("li");
-    li.textContent = `${item.time} → ${item.name}`;
-    list.appendChild(li);
+    const div = document.createElement("div");
+    div.textContent = `${item.name} - ${item.time}`;
+    listDiv.appendChild(div);
   });
-
-  // Check every 30 sec
-  setInterval(() => {
-    const now = new Date();
-    const hhmm = now.toTimeString().slice(0, 5); // HH:MM
-
-    schedule.forEach(item => {
-      if (item.time === hhmm) {
-        playVideo(item);
-      }
-    });
-  }, 30000);
 }
 
-// ========== Notifications Permission ==========
-if ("Notification" in window && Notification.permission !== "granted") {
-  Notification.requestPermission();
+// Show next item
+function updateNext() {
+  const now = new Date();
+  const hhmm = now.toTimeString().slice(0, 5);
+  const nextItem = schedule.find(item => item.time >= hhmm);
+
+  if (nextItem) {
+    nextDiv.textContent = `⏭ Next: ${nextItem.name} at ${nextItem.time}`;
+  } else {
+    nextDiv.textContent = "✅ All items for today are done.";
+  }
 }
 
-// ========== Install PWA ==========
-let deferredPrompt;
-const installBtn = document.getElementById("installBtn");
+// Check schedule every 5s
+setInterval(() => {
+  if (!unlocked || isPlaying) return; // don’t restart if already playing
 
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  installBtn.style.display = "inline-block";
-});
+  const now = new Date();
+  const hhmm = now.toTimeString().slice(0, 5);
 
-installBtn.addEventListener("click", async () => {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    log("📲 Install outcome: " + outcome);
-    deferredPrompt = null;
-    installBtn.style.display = "none";
+  const match = schedule.find(item => item.time === hhmm);
+  if (match) {
+    playItem(match);
+  } else {
+    updateNext();
+  }
+}, 5000);
+
+// Play a scheduled item
+function playItem(item) {
+  log(`▶ Playing: ${item.name} at ${item.time}`);
+  lastPlayed = item;
+  replayBtn.style.display = "inline-block";
+
+  // Always show video (no audio-only mode anymore)
+  document.getElementById("player").style.display = "block";
+  player.loadVideoById(item.videoId);
+
+  isPlaying = true;
+  player.playVideo();
+}
+
+// Replay button
+replayBtn.addEventListener("click", () => {
+  if (lastPlayed) {
+    playItem(lastPlayed);
   }
 });
 
-// ========== Service Worker ==========
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js")
-    .then(() => log("✅ Service Worker registered"))
-    .catch(err => log("❌ SW registration failed: " + err));
-}
+// Unlock audio/video button
+document.getElementById("unlockAudio").addEventListener("click", () => {
+  unlocked = true;
+  log("🔓 Audio/Video unlocked by user");
+  alert("Audio/Video enabled. The schedule will now play automatically.");
+});
 
-// Start
-startScheduler();
+// YouTube Iframe API ready
+function onYouTubeIframeAPIReady() {
+  player = new YT.Player("player", {
+    height: "360",
+    width: "640",
+    videoId: "",
+    events: {
+      onReady: () => {
+        log("✅ YouTube Player Ready");
+        loadSchedule();
+      },
+      onStateChange: (event) => {
+        if (event.data === YT.PlayerState.ENDED) {
+          isPlaying = false;
+          log("⏹ Playback finished");
+          updateNext();
+        }
+        if (event.data === YT.PlayerState.PLAYING) {
+          isPlaying = true;
+        }
+      }
+    }
+  });
+}

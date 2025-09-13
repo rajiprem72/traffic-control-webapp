@@ -72,49 +72,5 @@ function playItem(item) {
   lastPlayed = item;
   replayBtn.style.display = "inline-block";
 
-  // Always show video (no audio-only mode anymore)
-  document.getElementById("player").style.display = "block";
-  player.loadVideoById(item.videoId);
-
-  isPlaying = true;
-  player.playVideo();
-}
-
-// Replay button
-replayBtn.addEventListener("click", () => {
-  if (lastPlayed) {
-    playItem(lastPlayed);
-  }
-});
-
-// Unlock audio/video button
-document.getElementById("unlockAudio").addEventListener("click", () => {
-  unlocked = true;
-  log("🔓 Audio/Video unlocked by user");
-  alert("Audio/Video enabled. The schedule will now play automatically.");
-});
-
-// YouTube Iframe API ready
-function onYouTubeIframeAPIReady() {
-  player = new YT.Player("player", {
-    height: "360",
-    width: "640",
-    videoId: "",
-    events: {
-      onReady: () => {
-        log("✅ YouTube Player Ready");
-        loadSchedule();
-      },
-      onStateChange: (event) => {
-        if (event.data === YT.PlayerState.ENDED) {
-          isPlaying = false;
-          log("⏹ Playback finished");
-          updateNext();
-        }
-        if (event.data === YT.PlayerState.PLAYING) {
-          isPlaying = true;
-        }
-      }
-    }
-  });
-}
+  const playerDiv = document.getElementById("player");
+  playerDiv.style.display = "block"; // show
